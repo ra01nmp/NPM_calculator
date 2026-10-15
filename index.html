@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Calculadora de probabilidad de malignidad basada en un modelo de regresión logística.">
+  <title>Riesgo de malignidad primaria de nódulo/masa solitaria</title>
+
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1d2433;
+      --muted: #6b7385;
+      --border: #dde2ea;
+      --input-bg: #f8f9fb;
+      --primary: #0066ff;
+      --primary-hover: #0052cc;
+      --accent: #20c997;
+      --result: #1f7a63;
+      --error: #d93a3a;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(20, 30, 60, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11151c;
+        --card: #1a2029;
+        --text: #e8ecf2;
+        --muted: #98a1b3;
+        --border: #2d3542;
+        --input-bg: #222a35;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 520px;
+      margin: 0 auto;
+      background: var(--card);
+      padding: 32px 28px;
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    header { text-align: center; margin-bottom: 24px; }
+    header h1 { margin: 0; font-size: 1.5rem; }
+
+    .field { margin-bottom: 18px; border: none; padding: 0; }
+
+    .field-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      padding: 0;
+    }
+
+    .input-wrap { position: relative; }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 11px 48px 11px 12px;
+      font-size: 1rem;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15);
+    }
+
+    input[type="number"][aria-invalid="true"] { border-color: var(--error); }
+
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .unit {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.8rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .error-msg {
+      display: none;
+      margin-top: 5px;
+      font-size: 0.75rem;
+      color: var(--error);
+    }
+
+    .field.has-error .error-msg { display: block; }
+
+    .segmented { display: flex; gap: 8px; }
+    .segmented label { flex: 1; position: relative; }
+
+    .segmented input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      cursor: pointer;
+    }
+
+    .segmented span {
+      display: block;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 0.9rem;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .segmented label:hover span { border-color: var(--accent); }
+
+    .segmented input:checked + span {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .segmented input:focus-visible + span {
+      outline: 3px solid rgba(32, 201, 151, 0.4);
+      outline-offset: 2px;
+    }
+
+    .field.has-error .segmented span { border-color: var(--error); }
+
+    .actions { display: flex; gap: 10px; margin-top: 24px; }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+
+    .btn-primary { flex: 2; background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-secondary {
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* Contenedor del resultado: dos pestañas separadas */
+    .result-card {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+    }
+
+    /* Pestaña de probabilidad (azul pálido) */
+    .prob-card {
+      padding: 24px;
+      border-radius: var(--radius);
+      background: #e3eefc;
+      color: #17325c;
+    }
+
+    .result-card[hidden] { display: none; }
+
+    .result-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .result-title { font-size: 0.875rem; opacity: 0.9; }
+
+    .meter {
+      margin-top: 14px;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(23, 50, 92, 0.15);
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0;
+      background: var(--primary);
+      transition: width 0.4s ease;
+    }
+
+    /* Color de la barra según el nivel de riesgo */
+    .result-card[data-nivel="Bajo"]  .meter-fill { background: var(--result); }
+    .result-card[data-nivel="Medio"] .meter-fill { background: #f7e9b0; }
+    .result-card[data-nivel="Alto"]  .meter-fill { background: #c0392b; }
+
+    /* Pestaña de nivel de riesgo */
+    .risk-level {
+      padding: 16px 24px 18px;
+      border-radius: var(--radius);
+      background: var(--result);
+      color: #fff;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .result-card[data-nivel="Bajo"] .risk-level {
+      background: var(--result);
+      color: #fff;
+    }
+
+    .result-card[data-nivel="Medio"] .risk-level {
+      background: #f7e9b0;
+      color: #5a4500;
+      border-top-color: transparent;
+    }
+
+    .result-card[data-nivel="Medio"] .risk-value {
+      background: rgba(90, 69, 0, 0.12);
+    }
+
+    .result-card[data-nivel="Alto"] .risk-level {
+      background: #c0392b;
+      color: #fff;
+      border-top-color: transparent;
+    }
+
+    .risk-label { font-size: 0.8rem; opacity: 0.9; }
+
+    .risk-value {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 6px 18px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+      letter-spacing: 0.02em;
+    }
+
+    .risk-scale {
+      margin-top: 8px;
+      font-size: 0.72rem;
+      opacity: 0.85;
+    }
+
+    .save-status {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .save-status:empty { display: none; }
+
+    details.formula {
+      margin-top: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--input-bg);
+    }
+
+    details.formula summary { padding: 14px 16px; font-weight: 600; cursor: pointer; }
+
+    .formula-body { padding: 0 16px 16px; font-size: 0.85rem; }
+
+    .formula-body code {
+      display: block;
+      padding: 10px 12px;
+      margin: 8px 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .formula-body ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+
+    @media (max-width: 420px) {
+      .container { padding: 24px 18px; }
+      .segmented span { font-size: 0.82rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+
+    <header>
+      <h1>Riesgo de malignidad primaria de nódulo/masa solitaria</h1>
+    </header>
+
+    <form id="calcForm" novalidate>
+
+      <div class="field" id="field-edad">
+        <label class="field-label" for="edad">Edad</label>
+        <div class="input-wrap">
+          <input type="number" id="edad" name="edad" min="0" step="1" inputmode="numeric" required>
+          <span class="unit">años</span>
+        </div>
+        <div class="error-msg">Ingrese una edad válida (≥ 0).</div>
+      </div>
+
+      <fieldset class="field" id="field-densidad">
+        <legend class="field-label">Densidad</legend>
+        <div class="segmented">
+          <label><input type="radio" name="densidad" value="0"><span>Subsólido</span></label>
+          <label><input type="radio" name="densidad" value="1"><span>Mixto</span></label>
+          <label><input type="radio" name="densidad" value="2"><span>Sólido</span></label>
+        </div>
+        <div class="error-msg">Seleccione una opción.</div>
+      </fieldset>
+
+      <fieldset class="field" id="field-resp">
+        <legend class="field-label">Historial de enfermedad pulmonar</legend>
+        <div class="segmented">
+          <label><input type="radio" name="resp" value="1"><span>Sí</span></label>
+          <label><input type="radio" name="resp" value="0"><span>No</span></label>
+        </div>
+        <div class="error-msg">Seleccione una opción.</div>
+      </fieldset>
+
+      <fieldset class="field" id="field-onc">
+        <legend class="field-label">Antecedente oncológico</legend>
+        <div class="segmented">
+          <label><input type="radio" name="onc" value="1"><span>Sí</span></label>
+          <label><input type="radio" name="onc" value="0"><span>No</span></label>
+        </div>
+        <div class="error-msg">Seleccione una opción.</div>
+      </fieldset>
+
+      <fieldset class="field" id="field-crec">
+        <legend class="field-label">Crecimiento tumoral</legend>
+        <div class="segmented">
+          <label><input type="radio" name="crec" value="1"><span>Sí</span></label>
+          <label><input type="radio" name="crec" value="0"><span>No</span></label>
+        </div>
+        <div class="error-msg">Seleccione una opción.</div>
+      </fieldset>
+
+      <div class="actions">
+        <button type="reset" class="btn btn-secondary">Limpiar</button>
+        <button type="submit" class="btn btn-primary" id="btnCalcular">Calcular</button>
+      </div>
+    </form>
+
+    <section id="resultado" class="result-card" aria-live="polite" hidden>
+      <div class="prob-card">
+        <div class="result-value" id="valor">—</div>
+        <div class="result-title">Probabilidad de malignidad</div>
+        <div class="meter" aria-hidden="true">
+          <div class="meter-fill" id="meterFill"></div>
+        </div>
+      </div>
+      <div class="risk-level">
+        <div class="risk-label">Nivel de riesgo</div>
+        <div class="risk-value" id="nivelRiesgo">—</div>
+        <div class="risk-scale">Bajo &lt; 30 % · Medio 30–70 % · Alto &gt; 70 %</div>
+      </div>
+      <div class="save-status" id="saveStatus"></div>
+    </section>
+
+    <details class="formula">
+      <summary>Ver fórmula</summary>
+      <div class="formula-body">
+        <strong>Probabilidad</strong>
+        <code>P = 100 × e^X / (1 + e^X)</code>
+
+        <strong>Donde</strong>
+        <code>X = (0.0943 × edad) + (0.3395 × densidad) − (1.9429 × enf. pulmonar) − (0.0898 × ant. oncológico) + (4.6207 × crecimiento) − 5.1058</code>
+
+        <ul>
+          <li>Densidad: subsólido = 0, mixto = 1, sólido = 2</li>
+          <li>Historial de enfermedad pulmonar, antecedente oncológico y crecimiento tumoral: No = 0, Sí = 1</li>
+        </ul>
+      </div>
+    </details>
+
+  </main>
+
+  <script>
+    "use strict";
+
+    /* ---------------------------------------------------------
+       PEGA AQUÍ la URL de tu aplicación web de Apps Script
+       (la que termina en /exec)
+       --------------------------------------------------------- */
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxj82DU1h-zYkwank265Uct625HEx3qYydzz5FjN5WUxD3kU6-CgtFjMeJQSXnT-em6/exec";
+
+    const COEF = {
+      edad: 0.0943,
+      densidad: 0.3395,
+      resp: -1.9429,
+      onc: -0.0898,
+      crec: 4.6207,
+      intercepto: -5.1058
+    };
+
+    const RADIO_GROUPS = ["densidad", "resp", "onc", "crec"];
+
+    const form = document.getElementById("calcForm");
+    const resultado = document.getElementById("resultado");
+    const valorEl = document.getElementById("valor");
+    const meterFill = document.getElementById("meterFill");
+    const saveStatus = document.getElementById("saveStatus");
+    const btnCalcular = document.getElementById("btnCalcular");
+
+    function setError(name, hasError) {
+      const field = document.getElementById("field-" + name);
+      field.classList.toggle("has-error", hasError);
+      const input = field.querySelector('input[type="number"]');
+      if (input) input.setAttribute("aria-invalid", String(hasError));
+    }
+
+    function getRadioValue(name) {
+      const checked = form.querySelector('input[name="' + name + '"]:checked');
+      return checked ? Number(checked.value) : null;
+    }
+
+    function calcularProbabilidad(d) {
+      const X =
+        COEF.edad * d.edad +
+        COEF.densidad * d.densidad +
+        COEF.resp * d.resp +
+        COEF.onc * d.onc +
+        COEF.crec * d.crec +
+        COEF.intercepto;
+      return Math.exp(X) / (1 + Math.exp(X));
+    }
+
+    /* Nivel de riesgo: < 30 Bajo, 30–70 Medio, > 70 Alto */
+    function nivelDeRiesgo(porcentaje) {
+      if (porcentaje < 30) return "Bajo";
+      if (porcentaje <= 70) return "Medio";
+      return "Alto";
+    }
+
+    /* Envía el registro a Google Sheets (solo las 5 variables + resultado) */
+    function guardarRegistro(datos, porcentaje, nivel) {
+      if (!URL_SCRIPT.startsWith("https://")) {
+        saveStatus.textContent = "";
+        return;
+      }
+
+      saveStatus.textContent = "Guardando registro…";
+      btnCalcular.disabled = true;
+
+      fetch(URL_SCRIPT, {
+        method: "POST",
+        body: JSON.stringify({
+          edad: datos.edad,
+          densidad: datos.densidad,
+          resp: datos.resp,
+          onc: datos.onc,
+          crec: datos.crec,
+          probabilidad: Number(porcentaje),
+          nivel: nivel
+        })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          saveStatus.textContent = res.ok ? "✓ Registro guardado" : "No se pudo guardar el registro.";
+        })
+        .catch(function () {
+          saveStatus.textContent = "No se pudo guardar el registro. Revise su conexión.";
+        })
+        .finally(function () {
+          btnCalcular.disabled = false;
+        });
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const edad = parseFloat(document.getElementById("edad").value);
+      let valido = true;
+
+      const edadInvalida = isNaN(edad) || edad < 0;
+      setError("edad", edadInvalida);
+      if (edadInvalida) valido = false;
+
+      const datos = { edad: edad };
+      RADIO_GROUPS.forEach(function (name) {
+        const v = getRadioValue(name);
+        setError(name, v === null);
+        if (v === null) valido = false;
+        datos[name] = v;
+      });
+
+      if (!valido) {
+        resultado.hidden = true;
+        const primerError = form.querySelector(".has-error");
+        if (primerError) primerError.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      const P = calcularProbabilidad(datos);
+      const porcentaje = (P * 100).toFixed(2);
+
+      valorEl.textContent = porcentaje + " %";
+      meterFill.style.width = porcentaje + "%";
+
+      const nivel = nivelDeRiesgo(P * 100);
+      document.getElementById("nivelRiesgo").textContent = nivel;
+      resultado.dataset.nivel = nivel;
+      resultado.hidden = false;
+
+      guardarRegistro(datos, porcentaje, nivel);
+    });
+
+    form.addEventListener("input", function (event) {
+      const field = event.target.closest(".field");
+      if (field) setError(field.id.replace("field-", ""), false);
+    });
+
+    form.addEventListener("change", function (event) {
+      const field = event.target.closest(".field");
+      if (field) setError(field.id.replace("field-", ""), false);
+    });
+
+    form.addEventListener("reset", function () {
+      resultado.hidden = true;
+      meterFill.style.width = "0";
+      saveStatus.textContent = "";
+      ["edad"].concat(RADIO_GROUPS).forEach(function (name) {
+        setError(name, false);
+      });
+    });
+  </script>
+</body>
+</html>
