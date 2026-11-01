@@ -399,7 +399,7 @@
         <code>P = 100 × e^X / (1 + e^X)</code>
 
         <strong>Donde</strong>
-        <code>X = (0.0943 × edad) + (0.3395 × densidad) − (1.9429 × enf. pulmonar) − (0.0898 × ant. oncológico) + (4.6207 × crecimiento) − 5.1058</code>
+        <code>X = (0.0854 × edad) + (0.1567 × densidad) − (1.8431 × enf. pulmonar) − (0.1090 × ant. oncológico) + (3.7575 × crecimiento) − 5.4866</code>
 
         <ul>
           <li>Densidad: subsólido = 0, mixto = 1, sólido = 2</li>
@@ -420,12 +420,12 @@
     const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxj82DU1h-zYkwank265Uct625HEx3qYydzz5FjN5WUxD3kU6-CgtFjMeJQSXnT-em6/exec";
 
     const COEF = {
-      edad: 0.0943,
-      densidad: 0.3395,
-      resp: -1.9429,
-      onc: -0.0898,
-      crec: 4.6207,
-      intercepto: -5.1058
+      edad: 0.0854,
+      densidad: 0.1567,
+      resp: -1.8431,
+      onc: -0.1090,
+      crec: 3.7575,
+      intercepto: -5.4866
     };
 
     const RADIO_GROUPS = ["densidad", "resp", "onc", "crec"];
